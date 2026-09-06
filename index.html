@@ -107,6 +107,37 @@
         .form-group input::placeholder { color: #3a4a5a; font-weight: 400; }
         .form-group select option { background: #0a0e1a; color: #eef4ff; }
 
+        /* Toggle */
+        .toggle-group {
+            display: flex;
+            gap: 6px;
+            background: rgba(8,12,22,0.6);
+            border-radius: 14px;
+            padding: 4px;
+            border: 1px solid rgba(0,230,176,0.04);
+            margin-bottom: 14px;
+        }
+        .toggle-btn {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 12px;
+            background: transparent;
+            color: #5a6a80;
+            font-weight: 700;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: 0.3s;
+            letter-spacing: 0.5px;
+        }
+        .toggle-btn.active {
+            background: rgba(0,230,176,0.08);
+            color: #00e6b0;
+            border: 1px solid rgba(0,230,176,0.04);
+        }
+        .toggle-btn:active { transform: scale(0.94); }
+
         .row { display: flex; gap: 10px; }
         .row .form-group { flex: 1; }
 
@@ -183,15 +214,21 @@
                 <option value="owner">Owner</option>
             </select>
         </div>
-        <div class="row">
-            <div class="form-group">
-                <label>📅 Expired (Hari)</label>
-                <input type="number" id="expired_days" placeholder="30" value="30" min="1" required>
-            </div>
-            <div class="form-group">
-                <label>📅 Tanggal Daftar</label>
-                <input type="date" id="tanggal" required>
-            </div>
+
+        <!-- TOGGLE UNIT -->
+        <div class="toggle-group" id="toggleGroup">
+            <button type="button" class="toggle-btn active" data-unit="days">📅 Hari</button>
+            <button type="button" class="toggle-btn" data-unit="hours">⏰ Jam</button>
+            <button type="button" class="toggle-btn" data-unit="minutes">⏱️ Menit</button>
+        </div>
+
+        <div class="form-group">
+            <label id="unitLabel">📅 Jumlah Hari</label>
+            <input type="number" id="unitValue" placeholder="30" value="30" min="1" required>
+        </div>
+        <div class="form-group">
+            <label>📅 Tanggal Daftar</label>
+            <input type="date" id="tanggal" required>
         </div>
         <button type="submit" class="btn" id="submitBtn">➕ Tambahkan</button>
     </form>
@@ -202,14 +239,10 @@
     </div>
 </div>
 
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-    // ============================================================
-    // ===== FIREBASE CONFIG (PAKE PUNYA KAMU) =====
-    // ============================================================
     const firebaseConfig = {
         apiKey: "AIzaSyCARA9X8ZJdtQaD_3eSCRGJDn1BzdBp_DY",
         authDomain: "nilai-2aa04.firebaseapp.com",
@@ -219,7 +252,6 @@
         messagingSenderId: "545147756419",
         appId: "1:545147756419:web:6ad402531002e367e8a0b6"
     };
-    // ============================================================
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -228,12 +260,30 @@
     const nomorInput = document.getElementById('nomor');
     const namaInput = document.getElementById('nama');
     const roleSelect = document.getElementById('role');
-    const expiredInput = document.getElementById('expired_days');
+    const unitValue = document.getElementById('unitValue');
+    const unitLabel = document.getElementById('unitLabel');
     const tanggalInput = document.getElementById('tanggal');
     const statusDiv = document.getElementById('status');
     const submitBtn = document.getElementById('submitBtn');
+    const toggleBtns = document.querySelectorAll('.toggle-btn');
 
-    // Set tanggal hari ini sebagai default
+    let selectedUnit = 'days';
+
+    // Toggle logic
+    toggleBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            toggleBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedUnit = btn.dataset.unit;
+            const labels = {
+                days: '📅 Jumlah Hari',
+                hours: '⏰ Jumlah Jam',
+                minutes: '⏱️ Jumlah Menit'
+            };
+            unitLabel.textContent = labels[selectedUnit];
+        });
+    });
+
     tanggalInput.value = new Date().toISOString().split('T')[0];
 
     function setStatus(msg, type) {
@@ -247,7 +297,7 @@
         const nomor = nomorInput.value.trim().replace(/[^0-9]/g, '');
         const nama = namaInput.value.trim();
         const role = roleSelect.value;
-        const expired_days = parseInt(expiredInput.value.trim()) || 30;
+        const value = parseInt(unitValue.value.trim()) || 1;
         const tanggal = tanggalInput.value;
 
         if (!nomor || nomor.length < 10) {
@@ -267,16 +317,30 @@
         setStatus('⏳ Menyimpan ke Firebase...', 'loading');
 
         try {
-            // Simpan ke Firebase dengan struktur: users/nomor
-            await db.ref('users/' + nomor).set({
+            const data = {
                 nama: nama,
                 role: role,
-                expired_days: expired_days,
                 tanggal: tanggal,
                 createdAt: firebase.database.ServerValue.TIMESTAMP
-            });
+            };
 
-            setStatus(`✅ Berhasil! ${nama} (${nomor}) ditambahkan sebagai ${role} · ${expired_days} hari.`, 'success');
+            // Simpan sesuai unit
+            if (selectedUnit === 'days') {
+                data.expired_days = value;
+            } else if (selectedUnit === 'hours') {
+                data.expired_hours = value;
+            } else if (selectedUnit === 'minutes') {
+                data.expired_minutes = value;
+            }
+
+            await db.ref('users/' + nomor).set(data);
+
+            const unitText = {
+                days: `${value} hari`,
+                hours: `${value} jam`,
+                minutes: `${value} menit`
+            };
+            setStatus(`✅ Berhasil! ${nama} (${nomor}) · ${unitText[selectedUnit]}`, 'success');
             form.reset();
             tanggalInput.value = new Date().toISOString().split('T')[0];
         } catch (err) {
