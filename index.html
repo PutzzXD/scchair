@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUTZZ DB · Premium</title>
+    <title>PUTZZ DB · Firebase</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -160,7 +160,7 @@
     <div class="header">
         <span class="icon">⚡</span>
         <h1>PUTZZ DB</h1>
-        <p>Tambahkan nomor ke <span>db.json</span> · <span class="badge">GitHub</span></p>
+        <p>Tambahkan nomor ke <span>Firebase</span> · <span class="badge">Realtime</span></p>
     </div>
 
     <div class="glow-line"></div>
@@ -198,22 +198,31 @@
 
     <div class="status" id="status"></div>
     <div class="footer">
-        <span>PUTZZDEV</span> <span class="dev">· GitHub DB Writer</span>
+        <span>PUTZZDEV</span> <span class="dev">· Firebase DB Writer</span>
     </div>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
     // ============================================================
-    // ===== GANTI DENGAN DATA KAMU =====
+    // ===== FIREBASE CONFIG (PAKE PUNYA KAMU) =====
     // ============================================================
-    const GITHUB_TOKEN = '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'; // GANTI PAKE TOKEN ASLI
-    const REPO_OWNER = 'PutzzXD';
-    const REPO_NAME = 'Aincrad-byputzz';
-    const FILE_PATH = 'db.json';
+    const firebaseConfig = {
+        apiKey: "AIzaSyCARA9X8ZJdtQaD_3eSCRGJDn1BzdBp_DY",
+        authDomain: "nilai-2aa04.firebaseapp.com",
+        databaseURL: "https://nilai-2aa04-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "nilai-2aa04",
+        storageBucket: "nilai-2aa04.firebasestorage.app",
+        messagingSenderId: "545147756419",
+        appId: "1:545147756419:web:6ad402531002e367e8a0b6"
+    };
     // ============================================================
 
-    const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-    const RAW_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${FILE_PATH}`;
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     const form = document.getElementById('formAdd');
     const nomorInput = document.getElementById('nomor');
@@ -230,47 +239,6 @@
     function setStatus(msg, type) {
         statusDiv.textContent = msg;
         statusDiv.className = 'status ' + type;
-    }
-
-    async function getCurrentFileSha() {
-        const res = await fetch(API_URL, {
-            headers: { 'Authorization': `Bearer ${GITHUB_TOKEN}` }
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Gagal ambil SHA');
-        }
-        const data = await res.json();
-        return data.sha;
-    }
-
-    async function getCurrentDB() {
-        const res = await fetch(RAW_URL);
-        if (!res.ok) throw new Error('Gagal fetch db.json');
-        return await res.json();
-    }
-
-    async function updateFileOnGitHub(content, sha) {
-        const payload = {
-            message: `Tambah: ${nomorInput.value} - ${namaInput.value}`,
-            content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
-            sha: sha
-        };
-
-        const res = await fetch(API_URL, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${GITHUB_TOKEN}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Gagal update');
-        }
-        return await res.json();
     }
 
     form.addEventListener('submit', async (e) => {
@@ -296,22 +264,17 @@
         }
 
         submitBtn.disabled = true;
-        setStatus('⏳ Mengirim ke GitHub...', 'loading');
+        setStatus('⏳ Menyimpan ke Firebase...', 'loading');
 
         try {
-            const [sha, db] = await Promise.all([
-                getCurrentFileSha(),
-                getCurrentDB()
-            ]);
-
-            db[nomor] = {
+            // Simpan ke Firebase dengan struktur: users/nomor
+            await db.ref('users/' + nomor).set({
                 nama: nama,
                 role: role,
                 expired_days: expired_days,
-                tanggal: tanggal
-            };
-
-            await updateFileOnGitHub(db, sha);
+                tanggal: tanggal,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            });
 
             setStatus(`✅ Berhasil! ${nama} (${nomor}) ditambahkan sebagai ${role} · ${expired_days} hari.`, 'success');
             form.reset();
